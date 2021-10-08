@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-node@v2.4.1
         with:
           node-version: 14.18.0
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: https://npm.pkg.github.com
 
       - name: Cache node modules
         id: cache-nodemodules
@@ -79,10 +79,6 @@ jobs:
           tag_name: ${{ env.VERSION }}
           release_name: ${{ env.VERSION }}
           body_path: CHANGELOG.md
-
-      - uses: actions/setup-node@v2
-        with:
-          registry-url: https://npm.pkg.github.com
 
       - run: npm publish
         env:
