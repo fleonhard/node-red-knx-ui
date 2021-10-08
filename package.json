@@ -1,5 +1,5 @@
 {
-  "name": "@fleonhard/node-red-knx-ui",
+  "name": "node-red-knx-ui",
   "version": "0.0.7",
   "scripts": {
     "ng": "ng",
