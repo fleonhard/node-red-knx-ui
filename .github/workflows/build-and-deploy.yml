@@ -1,0 +1,90 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [ main ]
+
+concurrency: main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  buildAndDeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v2.4.1
+        with:
+          node-version: 14.18.0
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Cache node modules
+        id: cache-nodemodules
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Install Dependencies
+        if:
+          steps.cache-nodemodules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      #      - name: Lint
+      #        run: npm run lint
+
+      - name: Test
+        run: npm run test -- --configuration production
+
+      - name: Build
+        run: npm run build -- --configuration production
+
+      - name: Configure Git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name 'fleonhard'
+          git config --global user.email 'fleonhard@users.noreply.github.com'
+
+      - name: Update Version
+        run: echo "VERSION=$(npm version patch -m '[RELEASE] %s')" >> $GITHUB_ENV
+
+      - name: Generate Changelog
+        run: |
+          git log --pretty=format:"%s" "$(git describe --tags --abbrev=0 @^)"..@ > CHANGELOG.md
+          git add CHANGELOG.md
+          git commit --amend -m "[RELEASE] ${{ env.VERSION }}"
+
+      - name: Upload Changes
+        run: |
+          git push
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          draft: false
+          prerelease: false
+          tag_name: ${{ env.VERSION }}
+          release_name: ${{ env.VERSION }}
+          body_path: CHANGELOG.md
+
+      - uses: actions/setup-node@v2
+        with:
+          registry-url: https://npm.pkg.github.com
+          scope: '@octocat'
+
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
